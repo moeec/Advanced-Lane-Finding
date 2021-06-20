@@ -334,14 +334,14 @@ def fit_poly(img_shape, leftx, lefty, rightx, righty):
 def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):     
     # Create an image to draw on and an image to show the selection window
     out_img = np.dstack((binary_warped, binary_warped, binary_warped))*255
-    window_img = np.zeros_like(out_img)
-
-    
+    window_img = np.zeros_like(out_img).astype(np.uint8)
 
     # Recast the x and y points into usable format for cv2.fillPoly()
     left_lane_pts = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
     right_lane_pts = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
     lane_pts = np.hstack((left_lane_pts, right_lane_pts))
+    # Bug with fillPoly, needs explict cast to 32bit
+    lane_pts = np.int32([lane_pts])
     # Draw the lane onto the warped blank image
     cv2.fillPoly(out_img, lane_pts, (0,255, 0))
     # Warp the blank back to original image space using inverse perspective matrix (Minv)
