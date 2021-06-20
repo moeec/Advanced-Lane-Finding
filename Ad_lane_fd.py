@@ -338,12 +338,16 @@ def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):
 
     # Recast the x and y points into usable format for cv2.fillPoly()
     left_lane_pts = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
-    right_lane_pts = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
-    lane_pts = np.hstack((left_lane_pts, right_lane_pts))
+    #right_lane_pts = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+    #lane_pts = np.hstack((left_lane_pts, right_lane_pts))
     # Bug with fillPoly, needs explict cast to 32bit
-    lane_pts = np.int32([lane_pts])
+    lane_pts = np.int32([left_lane_pts])
+    left_lane_pts = np.int32([left_lane_pts])
+    left_lane_pts = np.squeeze(left_lane_pts)
     # Draw the lane onto the warped blank image
-    cv2.fillPoly(out_img, lane_pts, (0,255, 0))
+    # Example contours = np.array([[50,50], [50,150], [150,150], [150,50]])
+
+    cv2.fillPoly(out_img, left_lane_pts, (0,255, 0))
     # Warp the blank back to original image space using inverse perspective matrix (Minv)
     unwarp = unwarp(out_img) 
     # Combine the result with the original image
