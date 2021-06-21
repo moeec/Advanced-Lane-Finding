@@ -321,7 +321,7 @@ def fit_poly(img_shape, leftx, lefty, rightx, righty):
      ### TO-DO: Fit a second order polynomial to each with np.polyfit() ###
     left_fit = np.polyfit(lefty, leftx, 2)
     right_fit = np.polyfit(righty, rightx, 2)
-    print(left_fit)
+
     # Generate x and y values for plotting
     ploty = np.linspace(0, img_shape[0]-1, img_shape[0])
     ### TO-DO: Calc both polynomials using ploty, left_fit and right_fit ###
@@ -333,25 +333,29 @@ def fit_poly(img_shape, leftx, lefty, rightx, righty):
 
 def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):     
     # Create an image to draw on and an image to show the selection window
-    out_img = np.dstack((binary_warped, binary_warped, binary_warped))*255
-    window_img = np.zeros_like(out_img).astype(np.uint8)
+    out_img = binary_warped #np.dstack((binary_warped, binary_warped, binary_warped))*255
+    window_img = np.zeros_like(binary_warped)
 
     # Recast the x and y points into usable format for cv2.fillPoly()
     left_lane_pts = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
-    #right_lane_pts = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
-    #lane_pts = np.hstack((left_lane_pts, right_lane_pts))
+    right_lane_pts = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+    lane_pts = np.int32(np.hstack((left_lane_pts, right_lane_pts)))
     # Bug with fillPoly, needs explict cast to 32bit
-    lane_pts = np.int32([left_lane_pts])
+    print("left_lane_pts with brackets")
     left_lane_pts = np.int32([left_lane_pts])
-    left_lane_pts = np.squeeze(left_lane_pts)
+    print(left_lane_pts.shape)
+    print(window_img.shape)
+    #left_lane_pts = np.squeeze(left_lane_pts)
+    right_lane_pts = np.int32([right_lane_pts])
+    #right_lane_pts = np.squeeze(right_lane_pts)
     # Draw the lane onto the warped blank image
     # Example contours = np.array([[50,50], [50,150], [150,150], [150,50]])
-
-    cv2.fillPoly(out_img, left_lane_pts, (0,255, 0))
+    cv2.fillPoly(out_img, pts = lane_pts, color = (0,0,255),)
+    #cv2.fillPoly(out_img, pts = right_lane_pts, color = (0,0,255),)
     # Warp the blank back to original image space using inverse perspective matrix (Minv)
-    unwarp = unwarp(out_img) 
+    #new_img = unwarp(out_img) 
     # Combine the result with the original image
-    result = cv2.addWeighted(binary_warped, 1, unwarp, 0.3, 0)
+    result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
     
     return result
 
@@ -366,11 +370,10 @@ def ad_lane_finding_pipeline(img):
     combined = np.zeros_like(dir_binary)
     combined[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
     poly_image, left_fitx, right_fitx, ploty = fit_polynomial(combined)
-
-    
-    #final_image = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
-    next_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
-    return poly_image
+    draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
+    next_step = unwarp(draw_step)
+    #experiment = cv2.addWeighted(img, 1,next_step , 0.3, 0)
+    return next_step
 # Run the functions
 
 
@@ -380,19 +383,10 @@ plt.imshow(test_image)
 plt.show()
 
 
-#video_output = 'project_video_output.mp4'
-#clip1 = VideoFileClip("project_video.mp4")
-#combined_clip = clip1.fl_image(ad_lane_finding_pipeline)
-#combined_clip.write_videofile(video_output, audio=False)
+video_output = 'project_video_output.mp4'
+clip1 = VideoFileClip("project_video.mp4")
+combined_clip = clip1.fl_image(ad_lane_finding_pipeline)
+combined_clip.write_videofile(video_output, audio=False)
 
 
-#grad_binary = abs_sobel_thresh(undistorted, orient='x', thresh_min=20, thresh_max=100)
-# Plot the result
-#f, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 9))
-#f.tight_layout()
-#ax1.imshow(img)
-#ax1.set_title('Original Image', fontsize=50)
-#ax2.imshow(img, cmap='gray')
-#ax2.set_title('Thresholded Gradient', fontsize=50)
-#plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
 
