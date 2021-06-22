@@ -242,7 +242,7 @@ def fit_polynomial(binary_warped):
     plt.plot(left_fitx, ploty, color='yellow')
     plt.plot(right_fitx, ploty, color='yellow')
     #cv2.imwrite('fp.jpg', plt.plot(left_fitx, ploty, color='yellow'))
-    return out_img, left_fitx, right_fitx, ploty
+    return out_img, left_fitx, right_fitx, ploty, left_fit, right_fit
 
 def warp(img):
 
@@ -299,21 +299,24 @@ def unwarp(img):
     unwarped = cv2.warpPerspective(img, Minv, img_size, flags=cv2.INTER_NEAREST)
     return unwarped
 
-def measure_curvature_pixels():
-    '''
-    Calculates the curvature of polynomial functions in pixels.
-    '''
-    # Start by generating our fake example data
-    # Make sure to feed in your real data instead in your project!
-    ploty, left_fit, right_fit = generate_data()
+def measure_curvature_pixels(ploty, left_fit, right_fit, left_fitx, right_fitx):
+    #Calculates the curvature of polynomial functions in pixels.
+    
+    # Define conversions in x and y from pixels space to meters
+    ym_per_pix = 30/720 # meters per pixel in y dimension
+    xm_per_pix = 3.7/700 # meters per pixel in x dimension
+    
+    left_fit_cr = np.polyfit(ploty*ym_per_pix, left_fitx*xm_per_pix, 2)
+    right_fit_cr = np.polyfit(ploty*ym_per_pix, right_fitx*xm_per_pix, 2)
     
     # Define y-value where we want radius of curvature
     # We'll choose the maximum y-value, corresponding to the bottom of the image
     y_eval = np.max(ploty)
     
     # Calculation of R_curve (radius of curvature)
-    left_curverad = ((1 + (2*left_fit[0]*y_eval + left_fit[1])**2)**1.5) / np.absolute(2*left_fit[0])
-    right_curverad = ((1 + (2*right_fit[0]*y_eval + right_fit[1])**2)**1.5) / np.absolute(2*right_fit[0])
+    left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
+    right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
+    
     
     return left_curverad, right_curverad
 
@@ -356,6 +359,19 @@ def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):
     
     return result
 
+def display_curvature_data(img, curve_radius, car_position):
+    font = cv2.FONT_HERSHEY_SIMPLEX     
+    text = 'Curve radius: ' + '{:02.2f}'.format(curve_radius/1000) + 'Km'
+    #curve_radius = np.uint8(curve_radius)
+    #car_position = np.uint8(car_position)
+
+    cv2.putText(img, text, (30,70), font, 1, (0,255,0), 2, cv2.LINE_AA)
+    
+    text = 'Car pos. from center: ' + '{:02.3f}'.format(car_position) + 'm'
+    cv2.putText(img, text, (30,120), font, 1, (0,255,0), 2, cv2.LINE_AA)
+    
+    return img
+
 def ad_lane_finding_pipeline(img):
     #img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
     
@@ -367,11 +383,15 @@ def ad_lane_finding_pipeline(img):
     dir_binary = dir_threshold(pers_transform, sobel_kernel=3, thresh=(0, np.pi/2))
     combined = np.zeros_like(dir_binary)
     combined[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
-    poly_image, left_fitx, right_fitx, ploty = fit_polynomial(combined)
+    poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined)
     draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
-    next_step = unwarp(draw_step)
-    experiment = cv2.addWeighted(img, 0.8, next_step, 1, 0) 
-    return experiment
+    unwarp_step = unwarp(draw_step)
+    unwarp_step = np.uint8(unwarp_step)
+    img = np.uint8(img)
+    image_w_lanes_marked = cv2.addWeighted(img, 0.8, unwarp_step, 1, 0) 
+    left_curveradius, right_curveradius = measure_curvature_pixels(ploty, left_fit, right_fit, left_fitx, right_fitx)
+    image_w_text = display_curvature_data(image_w_lanes_marked, left_curveradius, right_curveradius)
+    return image_w_text
 # Run the functions
 
 
