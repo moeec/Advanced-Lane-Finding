@@ -341,10 +341,7 @@ def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):
     right_lane_pts = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
     lane_pts = np.int32(np.hstack((left_lane_pts, right_lane_pts)))
     # Bug with fillPoly, needs explict cast to 32bit
-    print("left_lane_pts with brackets")
     left_lane_pts = np.int32([left_lane_pts])
-    print(left_lane_pts.shape)
-    print(window_img.shape)
     #left_lane_pts = np.squeeze(left_lane_pts)
     right_lane_pts = np.int32([right_lane_pts])
     #right_lane_pts = np.squeeze(right_lane_pts)
@@ -361,6 +358,7 @@ def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):
 
 def ad_lane_finding_pipeline(img):
     #img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+    
     pers_transform = warp(img)
     hls_img = clr_thresh(pers_transform, s_thresh=(170, 255), sx_thresh=(20, 100))
     gradx = abs_sobel_thresh(pers_transform, orient='x', thresh_min=20, thresh_max=100)
@@ -372,8 +370,8 @@ def ad_lane_finding_pipeline(img):
     poly_image, left_fitx, right_fitx, ploty = fit_polynomial(combined)
     draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
     next_step = unwarp(draw_step)
-    #experiment = cv2.addWeighted(img, 1,next_step , 0.3, 0)
-    return next_step
+    experiment = cv2.addWeighted(img, 0.8, next_step, 1, 0) 
+    return experiment
 # Run the functions
 
 
