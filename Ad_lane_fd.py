@@ -317,8 +317,39 @@ def measure_curvature_pixels(ploty, left_fit, right_fit, left_fitx, right_fitx):
     left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
     right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
     
-    
     return left_curverad, right_curverad
+
+
+def measure_position_meters(image_w_lanes_marked, left_fit, right_fit):
+    # Define conversions in x from pixels space to meters(x just needed for this calculation)
+    ym_per_pix = 30/720 # meters per pixel in y dimension
+    xm_per_pix = 3.7/700 # meters per pixel in x dimension
+    
+    # Choose the y value corresponding to the bottom of the image
+    print(image_w_lanes_marked.shape)
+    bottom_of_image = image_w_lanes_marked[0]
+
+    print(bottom_of_image)
+    # Calculate left and right line positions at the bottom of the image
+    left_x_bottom_position = left_fit[0]*bottom_of_image**2 + left_fit[1]*bottom_of_image + left_fit[2]  
+    right_x_bottom_position = right_fit[0]*bottom_of_image**2 + right_fit[1]*bottom_of_image + right_fit[2]
+    
+    #Get single values for later calculation  
+    
+    left_x_bottom_position_avg = np.mean(left_x_bottom_position)
+    right_x_bottom_position_avg = np.mean(right_x_bottom_position)
+
+    
+    
+    # Calculate the x position of the center of the lane 
+    center_of_lane_x_position = (left_x_bottom_position_avg + left_x_bottom_position_avg)//2
+    # Calculate the deviation between the center of the lane and the center of the picture
+    # The car is assumed to be placed in the center of the picture
+    # If the deviation is negative, the car is on the felt hand side of the center of the lane
+    car_position = (center_of_lane_x_position - left_x_bottom_position_avg ) * xm_per_pix 
+    return car_position
+
+
 
 def fit_poly(img_shape, leftx, lefty, rightx, righty):
      ### TO-DO: Fit a second order polynomial to each with np.polyfit() ###
@@ -342,39 +373,39 @@ def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):
     # Recast the x and y points into usable format for cv2.fillPoly()
     left_lane_pts = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
     right_lane_pts = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+     # Horizontally stacking left and right & a Bug with fillPoly, needs explict cast to 32bit
     lane_pts = np.int32(np.hstack((left_lane_pts, right_lane_pts)))
-    # Bug with fillPoly, needs explict cast to 32bit
+   
     left_lane_pts = np.int32([left_lane_pts])
-    #left_lane_pts = np.squeeze(left_lane_pts)
+
     right_lane_pts = np.int32([right_lane_pts])
-    #right_lane_pts = np.squeeze(right_lane_pts)
+
     # Draw the lane onto the warped blank image
     # Example contours = np.array([[50,50], [50,150], [150,150], [150,50]])
     cv2.fillPoly(out_img, pts = lane_pts, color = (0,0,255),)
-    #cv2.fillPoly(out_img, pts = right_lane_pts, color = (0,0,255),)
-    # Warp the blank back to original image space using inverse perspective matrix (Minv)
-    #new_img = unwarp(out_img) 
     # Combine the result with the original image
     result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
     
     return result
 
-def display_curvature_data(img, curve_radius, car_position):
+def display_curvature_and_car_pos_info(img, curve_radius, car_position_from_center):
     font = cv2.FONT_HERSHEY_SIMPLEX     
-    text = 'Curve radius: ' + '{:02.2f}'.format(curve_radius/1000) + 'Km'
-    #curve_radius = np.uint8(curve_radius)
-    #car_position = np.uint8(car_position)
-
-    cv2.putText(img, text, (30,70), font, 1, (0,255,0), 2, cv2.LINE_AA)
     
-    text = 'Car pos. from center: ' + '{:02.3f}'.format(car_position) + 'm'
-    cv2.putText(img, text, (30,120), font, 1, (0,255,0), 2, cv2.LINE_AA)
+    text = 'Curve Radius: ' + '{:02.3f}'.format(curve_radius/1000) + 'km'
+    cv2.putText(img, text, (30,70), font, 1, (255,255,255), 2, cv2.LINE_AA)
+    
+    print(curve_radius.dtype)
+    print("Position")
+    print(car_position_from_center)
+  
+    
+    text = 'Car Position From Center: ' + '{:02.3f}'.format(car_position_from_center) + 'm'
+    cv2.putText(img, text, (30,120), font, 1, (255,255,255), 2, cv2.LINE_AA)
     
     return img
 
 def ad_lane_finding_pipeline(img):
-    #img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-    
+    #pipeline for video edit
     pers_transform = warp(img)
     hls_img = clr_thresh(pers_transform, s_thresh=(170, 255), sx_thresh=(20, 100))
     gradx = abs_sobel_thresh(pers_transform, orient='x', thresh_min=20, thresh_max=100)
@@ -387,10 +418,11 @@ def ad_lane_finding_pipeline(img):
     draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
     unwarp_step = unwarp(draw_step)
     unwarp_step = np.uint8(unwarp_step)
-    img = np.uint8(img)
     image_w_lanes_marked = cv2.addWeighted(img, 0.8, unwarp_step, 1, 0) 
     left_curveradius, right_curveradius = measure_curvature_pixels(ploty, left_fit, right_fit, left_fitx, right_fitx)
-    image_w_text = display_curvature_data(image_w_lanes_marked, left_curveradius, right_curveradius)
+    curve_radius = (left_curveradius+right_curveradius)/2
+    car_position_from_center = measure_position_meters(image_w_lanes_marked, left_fit, right_fit)
+    image_w_text = display_curvature_and_car_pos_info(image_w_lanes_marked, curve_radius, car_position_from_center)
     return image_w_text
 # Run the functions
 
