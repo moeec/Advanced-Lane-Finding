@@ -44,8 +44,45 @@ def cal_undistort(img, objpoints, imgpoints):
 
 ################Pipeline For Binary Image###########
 
-#images = glob.glob('test_images/*.jpg')
 
+
+class Line():
+    def __init__(self):
+        # was the line detected in the last iteration?
+        self.detected = False  
+        # x values of the last n fits of the line
+        self.recent_xfitted_right = [] 
+        # x values of the last n fits of the line
+        self.recent_xfitted_left = [] 
+        #average x values of the fitted line over the last n iterations
+        self.bestx_right = None
+        #average x values of the fitted line over the last n iterations
+        self.bestx_left = None
+        #polynomial coefficients averaged over the last n iterations
+        self.best_fit_right = None  
+        #polynomial coefficients for the most recent fit
+        self.best_fit_left = None  
+        #polynomial coefficients for the most recent fit
+        self.current_fit_right = [np.array([False])]  
+        #polynomial coefficients for the most recent fit
+        self.current_fit_left = [np.array([False])]  
+        #radius of curvature of the line in some units
+        self.radius_of_curvature = None 
+        #distance in meters of vehicle center from the line
+        self.line_base_pos = None 
+        #difference in fit coefficients between last and new fits
+        self.diffs_right = np.array([0,0,0], dtype='float') 
+        #difference in fit coefficients between last and new fits
+        self.diffs_left = np.array([0,0,0], dtype='float') 
+        #x values for detected line pixels
+        self.allx = None  
+        #y values for detected line pixels
+        self.ally = None  
+
+        
+global track_lines
+track_lines = Line()
+        
 def abs_sobel_thresh(img, orient='x', thresh_min=30, thresh_max=255):
     # Convert to grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
@@ -153,6 +190,8 @@ def find_lane_pixels(binary_warped):
     nonzero = binary_warped.nonzero()
     nonzeroy = np.array(nonzero[0])
     nonzerox = np.array(nonzero[1])
+    track_lines.allx = nonzerox
+    track_lines.ally = nonzeroy
     # Current positions to be updated later for each window in nwindows
     leftx_current = leftx_base
     rightx_current = rightx_base
@@ -326,27 +365,23 @@ def measure_position_meters(image_w_lanes_marked, left_fit, right_fit):
     xm_per_pix = 3.7/700 # meters per pixel in x dimension
     
     # Choose the y value corresponding to the bottom of the image
-    print(image_w_lanes_marked.shape)
     bottom_of_image = image_w_lanes_marked[0]
 
-    print(bottom_of_image)
     # Calculate left and right line positions at the bottom of the image
     left_x_bottom_position = left_fit[0]*bottom_of_image**2 + left_fit[1]*bottom_of_image + left_fit[2]  
     right_x_bottom_position = right_fit[0]*bottom_of_image**2 + right_fit[1]*bottom_of_image + right_fit[2]
     
-    #Get single values for later calculation  
-    
+    #Average out above numbers to get single value for left & right    
     left_x_bottom_position_avg = np.mean(left_x_bottom_position)
-    right_x_bottom_position_avg = np.mean(right_x_bottom_position)
-
-    
+    right_x_bottom_position_avg = np.mean(right_x_bottom_position) 
     
     # Calculate the x position of the center of the lane 
     center_of_lane_x_position = (left_x_bottom_position_avg + left_x_bottom_position_avg)//2
-    # Calculate the deviation between the center of the lane and the center of the picture
-    # The car is assumed to be placed in the center of the picture
-    # If the deviation is negative, the car is on the felt hand side of the center of the lane
+    
+    # Calculate the deviation from center of the lane 
+    # The camera on the care is assumed to be in the center of the car
     car_position = (center_of_lane_x_position - left_x_bottom_position_avg ) * xm_per_pix 
+    
     return car_position
 
 
@@ -355,15 +390,73 @@ def fit_poly(img_shape, leftx, lefty, rightx, righty):
      ### TO-DO: Fit a second order polynomial to each with np.polyfit() ###
     left_fit = np.polyfit(lefty, leftx, 2)
     right_fit = np.polyfit(righty, rightx, 2)
-
     # Generate x and y values for plotting
     ploty = np.linspace(0, img_shape[0]-1, img_shape[0])
     ### TO-DO: Calc both polynomials using ploty, left_fit and right_fit ###
     left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
     right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+    
     return left_fitx, right_fitx, ploty
 
+def search_around_poly(binary_warped, left_fit, right_fit):
+    # HYPERPARAMETER
+    # Choose the width of the margin around the previous polynomial to search
+    # The quiz grader expects 100 here, but feel free to tune on your own!
+    margin = 50
 
+    # Grab activated pixels
+    nonzero = binary_warped.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+    
+    ### TO-DO: Set the area of search based on activated x-values ###
+    ### within the +/- margin of our polynomial function ###
+    ### Hint: consider the window areas for the similarly named variables ###
+    ### in the previous quiz, but change the windows to our new search area ###
+    left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + 
+                    left_fit[2] - margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + 
+                    left_fit[1]*nonzeroy + left_fit[2] + margin)))
+    right_lane_inds = ((nonzerox > (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + 
+                    right_fit[2] - margin)) & (nonzerox < (right_fit[0]*(nonzeroy**2) + 
+                    right_fit[1]*nonzeroy + right_fit[2] + margin)))
+    
+    # Again, extract left and right line pixel positions
+    leftx = nonzerox[left_lane_inds]
+    lefty = nonzeroy[left_lane_inds] 
+    rightx = nonzerox[right_lane_inds]
+    righty = nonzeroy[right_lane_inds]
+
+    # Fit new polynomials
+    left_fitx, right_fitx, ploty = fit_poly(binary_warped.shape, leftx, lefty, rightx, righty)
+    
+    ## Visualization ##
+    # Create an image to draw on and an image to show the selection window
+    out_img = np.dstack((binary_warped, binary_warped, binary_warped))*255
+    window_img = np.zeros_like(out_img)
+    # Color in left and right line pixels
+    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+
+    # Generate a polygon to illustrate the search window area
+    # And recast the x and y points into usable format for cv2.fillPoly()
+    left_line_window1 = np.array([np.transpose(np.vstack([left_fitx-margin, ploty]))])
+    left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx+margin, ploty])))])
+    left_line_pts = np.hstack((left_line_window1, left_line_window2))
+    right_line_window1 = np.array([np.transpose(np.vstack([right_fitx-margin, ploty]))])
+    right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx+margin, ploty])))])
+    right_line_pts = np.hstack((right_line_window1, right_line_window2))
+
+    # Draw the lane onto the warped blank image
+    cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 0))
+    cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
+    result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
+    
+    # Plot the polynomial lines onto the image
+    plt.plot(left_fitx, ploty, color='yellow')
+    plt.plot(right_fitx, ploty, color='yellow')
+    ## End visualization steps ##
+    
+    return result,left_fitx, right_fitx, ploty, left_fit, right_fit
 
 def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):     
     # Create an image to draw on and an image to show the selection window
@@ -382,7 +475,7 @@ def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):
 
     # Draw the lane onto the warped blank image
     # Example contours = np.array([[50,50], [50,150], [150,150], [150,50]])
-    cv2.fillPoly(out_img, pts = lane_pts, color = (0,0,255),)
+    cv2.fillPoly(out_img, pts = lane_pts, color = (0,255,0),)
     # Combine the result with the original image
     result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
     
@@ -391,21 +484,20 @@ def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):
 def display_curvature_and_car_pos_info(img, curve_radius, car_position_from_center):
     font = cv2.FONT_HERSHEY_SIMPLEX     
     
-    text = 'Curve Radius: ' + '{:02.3f}'.format(curve_radius/1000) + 'km'
+    text = 'Curve Radius: ' + '{:02.4f}'.format(curve_radius/1000) + 'km'
     cv2.putText(img, text, (30,70), font, 1, (255,255,255), 2, cv2.LINE_AA)
-    
-    print(curve_radius.dtype)
-    print("Position")
-    print(car_position_from_center)
-  
-    
-    text = 'Car Position From Center: ' + '{:02.3f}'.format(car_position_from_center) + 'm'
+      
+    text = 'Car Position From Center: ' + '{:02.4f}'.format(car_position_from_center) + 'm'
     cv2.putText(img, text, (30,120), font, 1, (255,255,255), 2, cv2.LINE_AA)
     
     return img
 
 def ad_lane_finding_pipeline(img):
     #pipeline for video edit
+    
+
+
+  
     pers_transform = warp(img)
     hls_img = clr_thresh(pers_transform, s_thresh=(170, 255), sx_thresh=(20, 100))
     gradx = abs_sobel_thresh(pers_transform, orient='x', thresh_min=20, thresh_max=100)
@@ -414,19 +506,61 @@ def ad_lane_finding_pipeline(img):
     dir_binary = dir_threshold(pers_transform, sobel_kernel=3, thresh=(0, np.pi/2))
     combined = np.zeros_like(dir_binary)
     combined[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
+    
     poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined)
-    draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
+
+
+    
+    if (0 < left_fitx.size & right_fitx.size):
+        print("in if loop, lines detected!")
+        track_lines.detected = True
+
+        track_lines.bestx_right = (track_lines.current_fit_right+right_fit)/2 
+        track_lines.diffs_right = right_fit - track_lines.current_fit_right
+        track_lines.diffs_left = left_fit - track_lines.current_fit_left
+        Check_diffs_left = track_lines.diffs_left.item(0)
+        Check_diffs_left = abs(Check_diffs_left)
+        print(Check_diffs_left)
+        
+        if (Check_diffs_left > 0.0013):
+            print("larger than .00325")
+            file = open("car.txt", "a")
+            file.write(str(Check_diffs_left) + "\n")
+            file.close
+            cv2.imwrite("outlier.jpg", img)
+            right_fitx = track_lines.recent_xfitted_right
+            left_fitx =  track_lines.recent_xfitted_left 
+            right_fit = track_lines.current_fit_right 
+            left_fit = track_lines.current_fit_left
+            print("Greater")
+            draw_step, left_fitx, right_fitx, ploty, left_fit, right_fit  = search_around_poly(combined, left_fit, right_fit)        
+        else:
+            track_lines.recent_xfitted_right = right_fitx
+            track_lines.recent_xfitted_left =  left_fitx
+            track_lines.current_fit_right = right_fit
+            track_lines.current_fit_left = left_fit
+            draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
+            print("In else")
+        
+    
+       
+        
+    
+
     unwarp_step = unwarp(draw_step)
     unwarp_step = np.uint8(unwarp_step)
     image_w_lanes_marked = cv2.addWeighted(img, 0.8, unwarp_step, 1, 0) 
     left_curveradius, right_curveradius = measure_curvature_pixels(ploty, left_fit, right_fit, left_fitx, right_fitx)
     curve_radius = (left_curveradius+right_curveradius)/2
+    track_lines.radius_of_curvature = curve_radius
     car_position_from_center = measure_position_meters(image_w_lanes_marked, left_fit, right_fit)
+    track_lines.line_base_pos = car_position_from_center 
     image_w_text = display_curvature_and_car_pos_info(image_w_lanes_marked, curve_radius, car_position_from_center)
+   
+    
     return image_w_text
-# Run the functions
 
-
+# Run pipeline
 image = mpimg.imread('test_images/straight_lines2.jpg')
 test_image = ad_lane_finding_pipeline(image)
 plt.imshow(test_image)
