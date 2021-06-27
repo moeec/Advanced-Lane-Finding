@@ -494,9 +494,6 @@ def display_curvature_and_car_pos_info(img, curve_radius, car_position_from_cent
 
 def ad_lane_finding_pipeline(img):
     #pipeline for video edit
-    
-
-
   
     pers_transform = warp(img)
     hls_img = clr_thresh(pers_transform, s_thresh=(170, 255), sx_thresh=(20, 100))
@@ -504,11 +501,12 @@ def ad_lane_finding_pipeline(img):
     grady = abs_sobel_thresh(pers_transform, orient='y', thresh_min=20, thresh_max=100)
     mag_binary = mag_thresh(pers_transform, sobel_kernel=3, mag_thresh=(50, 255))
     dir_binary = dir_threshold(pers_transform, sobel_kernel=3, thresh=(0, np.pi/2))
+    sobel = abs_sobel_thresh(pers_transform, orient='x', thresh_min=30, thresh_max=255)
     combined = np.zeros_like(dir_binary)
     combined[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
     
     poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined)
-
+    
 
     
     if (0 < left_fitx.size & right_fitx.size):
@@ -516,6 +514,7 @@ def ad_lane_finding_pipeline(img):
         track_lines.detected = True
 
         track_lines.bestx_right = (track_lines.current_fit_right+right_fit)/2 
+        track_lines.bestx_left = (track_lines.current_fit_left+left_fit)/2 
         track_lines.diffs_right = right_fit - track_lines.current_fit_right
         track_lines.diffs_left = left_fit - track_lines.current_fit_left
         Check_diffs_left = track_lines.diffs_left.item(0)
@@ -523,11 +522,15 @@ def ad_lane_finding_pipeline(img):
         print(Check_diffs_left)
         
         if (Check_diffs_left > 0.0013):
+            print("previous")
+            print(track_lines.current_fit_left)
+            print("current")
+            print(left_fit)
             print("larger than .00325")
             file = open("car.txt", "a")
             file.write(str(Check_diffs_left) + "\n")
             file.close
-            cv2.imwrite("outlier.jpg", img)
+            cv2.imwrite("outlier.jpg", combined)
             right_fitx = track_lines.recent_xfitted_right
             left_fitx =  track_lines.recent_xfitted_left 
             right_fit = track_lines.current_fit_right 
@@ -541,6 +544,7 @@ def ad_lane_finding_pipeline(img):
             track_lines.current_fit_left = left_fit
             draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
             print("In else")
+            print()
         
     
        
