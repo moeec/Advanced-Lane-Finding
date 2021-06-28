@@ -83,7 +83,7 @@ class Line():
 global track_lines
 track_lines = Line()
         
-def abs_sobel_thresh(img, orient='x', thresh_min=30, thresh_max=255):
+def abs_sobel_thresh(img, orient='x', thresh_min=90, thresh_max=255):
     # Convert to grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     # Apply x or y gradient with the OpenCV Sobel() function
@@ -101,6 +101,8 @@ def abs_sobel_thresh(img, orient='x', thresh_min=30, thresh_max=255):
 
     # Return the result
     return binary_output
+
+
 
 def dir_threshold(img, sobel_kernel=3, thresh=(0, np.pi/2)):
     
@@ -142,6 +144,13 @@ def mag_thresh(img, sobel_kernel=3, mag_thresh=(0, 255)):
     # Return the binary image
     return binary_output
 
+def hls_select(img, thresh=(0, 255)):
+    hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
+    s_channel = hls[:,:,2]
+    binary_output = np.zeros_like(s_channel)
+    binary_output[(s_channel > thresh[0]) & (s_channel <= thresh[1])] = 1
+    return binary_output
+
 def clr_thresh(img, s_thresh=(170, 255), sx_thresh=(20, 100)):
     img = np.copy(img)
     # Convert to HLS color space and separate the V channel
@@ -162,6 +171,7 @@ def clr_thresh(img, s_thresh=(170, 255), sx_thresh=(20, 100)):
     s_binary[(s_channel >= s_thresh[0]) & (s_channel <= s_thresh[1])] = 1
     # Stack each channel
     color_binary = np.dstack(( np.zeros_like(sxbinary), sxbinary, s_binary)) * 255
+    print(color_binary.shape)
     return color_binary
 
 
@@ -495,17 +505,23 @@ def ad_lane_finding_pipeline(img):
     #pipeline for video edit
   
     pers_transform = warp(img)
-    hls_img = clr_thresh(pers_transform, s_thresh=(170, 255), sx_thresh=(20, 100))
-    gradx = abs_sobel_thresh(pers_transform, orient='x', thresh_min=20, thresh_max=100)
-    grady = abs_sobel_thresh(pers_transform, orient='y', thresh_min=20, thresh_max=100)
-    cv2.imwrite("outlier2.jpg", gradx)
-    mag_binary = mag_thresh(pers_transform, sobel_kernel=3, mag_thresh=(50, 255))
+    hls_img = hls_select(pers_transform, thresh=(90, 255))
+    gradx = abs_sobel_thresh(pers_transform, orient='x', thresh_min=30, thresh_max=255)
+   
+    grady = abs_sobel_thresh(pers_transform, orient='y', thresh_min=30, thresh_max=100)
+    mag_binary = mag_thresh(pers_transform, sobel_kernel=3, mag_thresh=(20, 100))
     dir_binary = dir_threshold(pers_transform, sobel_kernel=3, thresh=(0, np.pi/2))
-    sobel = abs_sobel_thresh(pers_transform, orient='x', thresh_min=30, thresh_max=255)
+    sobel = abs_sobel_thresh(pers_transform, orient='x', thresh_min=90, thresh_max=255)
+    
     combined = np.zeros_like(dir_binary)
     combined[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
+        
+    combined_final = np.zeros_like(dir_binary)
+    combined_final[(combined == 1)|(hls_img == 1)] = 1
     
-    poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined)   
+    cv2.imwrite("outlier2.jpg", combined_final)
+    
+    poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined_final)   
     
     if (0 < left_fitx.size & right_fitx.size):
         print("Lines detected!")
@@ -517,27 +533,24 @@ def ad_lane_finding_pipeline(img):
         track_lines.diffs_left = left_fit - track_lines.current_fit_left
         Check_diffs_left = track_lines.diffs_left.item(0)
         Check_diffs_left = abs(Check_diffs_left)
-        print(Check_diffs_left)
-        file = open("car_all.txt", "a")
-        file.write(str(Check_diffs_left) + "\n")
-        file.close
         
         if (Check_diffs_left > 0.0019): 
             print("previous")
             print(track_lines.current_fit_left)
             print("current")
+            print(Check_diffs_left)
             print(left_fit)
             print("larger than .0016")
             file = open("car.txt", "a")
             file.write(str(Check_diffs_left) + "\n")
             file.close
-            cv2.imwrite("outlier.jpg", gradx)
+            cv2.imwrite("outlier.jpg", hls_img)
             right_fitx = track_lines.recent_xfitted_right
             left_fitx =  track_lines.recent_xfitted_left 
             right_fit = track_lines.current_fit_right 
             left_fit = track_lines.current_fit_left
             print("Greater")
-            poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit  = search_around_poly(combined, left_fit, right_fit)
+            poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit  = fit_polynomial(combined_final)
         
         else:  
             track_lines.recent_xfitted_right = right_fitx
@@ -560,7 +573,7 @@ def ad_lane_finding_pipeline(img):
     return image_w_text
 
 # Run pipeline
-image = mpimg.imread('test_images/straight_lines2.jpg')
+image = mpimg.imread('test_images/test1.jpg')
 test_image = ad_lane_finding_pipeline(image)
 plt.imshow(test_image)
 plt.show()
