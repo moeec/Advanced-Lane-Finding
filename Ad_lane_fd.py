@@ -474,7 +474,6 @@ def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):
     right_lane_pts = np.int32([right_lane_pts])
 
     # Draw the lane onto the warped blank image
-    # Example contours = np.array([[50,50], [50,150], [150,150], [150,50]])
     cv2.fillPoly(out_img, pts = lane_pts, color = (0,255,0),)
     # Combine the result with the original image
     result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
@@ -499,18 +498,17 @@ def ad_lane_finding_pipeline(img):
     hls_img = clr_thresh(pers_transform, s_thresh=(170, 255), sx_thresh=(20, 100))
     gradx = abs_sobel_thresh(pers_transform, orient='x', thresh_min=20, thresh_max=100)
     grady = abs_sobel_thresh(pers_transform, orient='y', thresh_min=20, thresh_max=100)
+    cv2.imwrite("outlier2.jpg", gradx)
     mag_binary = mag_thresh(pers_transform, sobel_kernel=3, mag_thresh=(50, 255))
     dir_binary = dir_threshold(pers_transform, sobel_kernel=3, thresh=(0, np.pi/2))
     sobel = abs_sobel_thresh(pers_transform, orient='x', thresh_min=30, thresh_max=255)
     combined = np.zeros_like(dir_binary)
     combined[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
     
-    poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined)
-    
-
+    poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined)   
     
     if (0 < left_fitx.size & right_fitx.size):
-        print("in if loop, lines detected!")
+        print("Lines detected!")
         track_lines.detected = True
 
         track_lines.bestx_right = (track_lines.current_fit_right+right_fit)/2 
@@ -520,37 +518,35 @@ def ad_lane_finding_pipeline(img):
         Check_diffs_left = track_lines.diffs_left.item(0)
         Check_diffs_left = abs(Check_diffs_left)
         print(Check_diffs_left)
+        file = open("car_all.txt", "a")
+        file.write(str(Check_diffs_left) + "\n")
+        file.close
         
-        if (Check_diffs_left > 0.0013):
+        if (Check_diffs_left > 0.0019): 
             print("previous")
             print(track_lines.current_fit_left)
             print("current")
             print(left_fit)
-            print("larger than .00325")
+            print("larger than .0016")
             file = open("car.txt", "a")
             file.write(str(Check_diffs_left) + "\n")
             file.close
-            cv2.imwrite("outlier.jpg", combined)
+            cv2.imwrite("outlier.jpg", gradx)
             right_fitx = track_lines.recent_xfitted_right
             left_fitx =  track_lines.recent_xfitted_left 
             right_fit = track_lines.current_fit_right 
             left_fit = track_lines.current_fit_left
             print("Greater")
-            draw_step, left_fitx, right_fitx, ploty, left_fit, right_fit  = search_around_poly(combined, left_fit, right_fit)        
-        else:
+            poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit  = search_around_poly(combined, left_fit, right_fit)
+        
+        else:  
             track_lines.recent_xfitted_right = right_fitx
             track_lines.recent_xfitted_left =  left_fitx
             track_lines.current_fit_right = right_fit
             track_lines.current_fit_left = left_fit
-            draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
-            print("In else")
-            print()
-        
+            print("In else")  
     
-       
-        
-    
-
+    draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
     unwarp_step = unwarp(draw_step)
     unwarp_step = np.uint8(unwarp_step)
     image_w_lanes_marked = cv2.addWeighted(img, 0.8, unwarp_step, 1, 0) 
@@ -560,7 +556,6 @@ def ad_lane_finding_pipeline(img):
     car_position_from_center = measure_position_meters(image_w_lanes_marked, left_fit, right_fit)
     track_lines.line_base_pos = car_position_from_center 
     image_w_text = display_curvature_and_car_pos_info(image_w_lanes_marked, curve_radius, car_position_from_center)
-   
     
     return image_w_text
 
