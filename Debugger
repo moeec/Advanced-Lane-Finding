@@ -311,6 +311,77 @@ def fit_polynomial(binary_warped):
     #cv2.imwrite('fp.jpg', plt.plot(left_fitx, ploty, color='yellow'))
     return out_img, left_fitx, right_fitx, ploty, left_fit, right_fit
 
+
+
+def search_around_poly(binary_warped):
+    # HYPERPARAMETER
+    # Choose the width of the margin around the previous polynomial to search
+    # The quiz grader expects 100 here, but feel free to tune on your own!
+    margin = 100
+    
+    left_fit = track_lines.current_fit_left
+    right_fit = track_lines.current_fit_right
+
+    # Grab activated pixels
+    nonzero = binary_warped.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+    
+    ### TO-DO: Set the area of search based on activated x-values ###
+    ### within the +/- margin of our polynomial function ###
+    ### Hint: consider the window areas for the similarly named variables ###
+    ### in the previous quiz, but change the windows to our new search area ###
+    left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + 
+                    left_fit[2] - margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + 
+                    left_fit[1]*nonzeroy + left_fit[2] + margin)))
+    right_lane_inds = ((nonzerox > (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + 
+                    right_fit[2] - margin)) & (nonzerox < (right_fit[0]*(nonzeroy**2) + 
+                    right_fit[1]*nonzeroy + right_fit[2] + margin)))
+    
+    # Again, extract left and right line pixel positions
+    leftx = nonzerox[left_lane_inds]
+    lefty = nonzeroy[left_lane_inds] 
+    rightx = nonzerox[right_lane_inds]
+    righty = nonzeroy[right_lane_inds]
+
+    # Fit new polynomials
+    left_fitx, right_fitx, ploty, left_fit, right_fit = fit_poly(binary_warped.shape, leftx, lefty, rightx, righty)
+    
+    ## Visualization ##
+    # Create an image to draw on and an image to show the selection window
+    out_img = np.dstack((binary_warped, binary_warped, binary_warped))*255
+    window_img = np.zeros_like(out_img)
+    # Color in left and right line pixels
+    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+
+    # Generate a polygon to illustrate the search window area
+    # And recast the x and y points into usable format for cv2.fillPoly()
+    left_line_window1 = np.array([np.transpose(np.vstack([left_fitx-margin, ploty]))])
+    left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx+margin, 
+                              ploty])))])
+    left_line_pts = np.hstack((left_line_window1, left_line_window2))
+    right_line_window1 = np.array([np.transpose(np.vstack([right_fitx-margin, ploty]))])
+    right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx+margin, 
+                              ploty])))])
+    right_line_pts = np.hstack((right_line_window1, right_line_window2))
+
+    # Draw the lane onto the warped blank image
+    #cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 0))
+    #cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
+    result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
+    
+    # Plot the polynomial lines onto the image
+    plt.plot(left_fitx, ploty, color='yellow')
+    plt.plot(right_fitx, ploty, color='yellow')
+    ## End visualization steps ##
+    
+    
+    return result, left_fitx, right_fitx, ploty, left_fit, right_fit
+
+
+
+
 def fit_polynomial_wo_histogram(combined_final, left_fit, right_fit,leftx, lefty, rightx, righty):
     
     margin = 50
@@ -323,8 +394,8 @@ def fit_polynomial_wo_histogram(combined_final, left_fit, right_fit,leftx, lefty
     nonzeroy = np.array(nonzero[0])
     nonzerox = np.array(nonzero[1])
     
-    #track_lines.allx = nonzerox
-    #track_lines.ally = nonzeroy
+    track_lines.allx = nonzerox
+    track_lines.ally = nonzeroy
     
     left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + 
                     left_fit[2] - margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + 
@@ -376,7 +447,7 @@ def fit_poly(img_shape, leftx, lefty, rightx, righty):
     left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
     right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
     
-    return left_fitx, right_fitx, ploty
+    return left_fitx, right_fitx, ploty, left_fit, right_fit
 
 def warp(img):
 
@@ -598,14 +669,18 @@ def ad_lane_finding_pipeline(img):
         track_lines.current_fit_right = right_fit
         track_lines.current_fit_left = left_fit
         print("rightx")
-        print(rightx)
+        print(track_lines.allx_right)
         print("righty")
-        print(righty)
+        print(track_lines.ally_right)
         print("leftx")
-        print(leftx)
+        print(track_lines.allx_left)
         print("lefty")
-        print(lefty)
-        print("1st time")
+        print(track_lines.ally_left)
+        print("---------------------------------------------1st time------------------------------------------")
+        rightx = track_lines.allx_right   
+        righty = track_lines.ally_right   
+        leftx = track_lines.allx_left     
+        lefty = track_lines.ally_left
     else:
         #------------------Searching Around Previous Region-------------------------
         #Picking up values from previous frame
@@ -627,8 +702,10 @@ def ad_lane_finding_pipeline(img):
         print(lefty)
         print(lefty)
         print("end of else loop")
-        draw_step, left_fitx, right_fitx, ploty = fit_polynomial_wo_histogram(combined_final, left_fit, right_fit,leftx, lefty, rightx, righty)
+        poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = search_around_poly(combined_final)
         draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
+        
+        
     
     #Verify lines were detected and proceed onto next frame
     if (left_fitx.size & right_fitx.size == 0):
@@ -657,11 +734,7 @@ def ad_lane_finding_pipeline(img):
     track_lines.recent_xfitted_right = right_fitx
     track_lines.recent_xfitted_left =  left_fitx
     track_lines.current_fit_right = right_fit
-    track_lines.current_fit_left = left_fit
-    rightx = track_lines.allx_right   
-    righty = track_lines.ally_right   
-    leftx = track_lines.allx_left     
-    lefty = track_lines.ally_left 
+    track_lines.current_fit_left = left_fit 
 
     return final_image_w_text
 
