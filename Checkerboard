@@ -1,0 +1,75 @@
+import pickle
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+import glob
+
+################Distortion correction calculated via camera calibration###########
+
+# Adjustable checkerboard Dimensions
+cbrow = 6
+cbcol = 9
+
+# prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+objp = np.zeros((cbrow * cbcol, 3), np.float32)
+objp[:, :2] = np.mgrid[0:cbcol, 0:cbrow].T.reshape(-1, 2)
+
+# Arrays to store object points and image points from all the images.
+objpoints = [] # 3d points in real world space
+imgpoints = [] # 2d points in image plane.
+
+# Make a list of calibration images
+images = glob.glob('camera_cal/calibration*.jpg')
+
+
+def cal_undistort(img, objpoints, imgpoints):
+    # Use cv2.calibrateCamera() and cv2.undistort()
+    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[::-1], None, None)
+    undist = cv2.undistort(img, mtx, dist, None, mtx)
+    return undist
+
+# Step through the list and search for chessboard corners
+for idx, fname in enumerate(images):
+    cal_img = cv2.imread(fname)
+    gray = cv2.cvtColor(cal_img, cv2.COLOR_BGR2GRAY)
+
+# Find Chessboard corners
+    ret, corners = cv2.findChessboardCorners(gray, (9,6), None)
+
+    if ret == True:
+        objpoints.append(objp)
+        imgpoints.append(corners)
+        
+cal_img = cv2.drawChessboardCorners(cal_img, (9,6), corners, ret)
+
+imageDir = "output_images/" #specify your path here
+
+image_path_list = []
+
+# Read in several images
+for image in images:
+
+    img = cv2.imread(image)
+    img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+
+# TODO: Write a function that takes an image, object points, and image points
+# performs the camera calibration, image distortion correction and 
+# returns the undistorted image
+
+
+
+
+    undistorted = cal_undistort(img, objpoints, imgpoints)
+
+
+    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 9))
+    f.tight_layout()
+    ax1.imshow(img)
+    ax1.set_title('Original Image', fontsize=50)
+    ax2.imshow(undistorted)
+    ax2.set_title('Undistorted Image', fontsize=50)
+    plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
+
+    cv2.imwrite("output_images/calibration1.jpg", undistorted)
+    
