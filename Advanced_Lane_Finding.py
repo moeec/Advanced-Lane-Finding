@@ -87,12 +87,6 @@ class Line():
 
 global track_lines
 track_lines = Line()
-
-
-
-       
-
-
         
 def abs_sobel_thresh(img, orient='x', thresh_min=90, thresh_max=255): # not use in  initial assignment, left for reference and for harder challenge 
     # Convert to grayscale
@@ -113,8 +107,6 @@ def abs_sobel_thresh(img, orient='x', thresh_min=90, thresh_max=255): # not use 
     # Return the result
     return binary_output
 
-
-
 def dir_threshold(img, sobel_kernel=3, thresh=(0, np.pi/2)):
     
     # Apply the following steps to img
@@ -133,7 +125,6 @@ def dir_threshold(img, sobel_kernel=3, thresh=(0, np.pi/2)):
     binary_output[(absgraddir >= thresh[0]) & (absgraddir <= thresh[1])] = 1
     #binary_output = np.copy(img) # Remove this line
     return binary_output
-
 
 # Define a function to return the magnitude of the gradient
 # for a given sobel kernel size and threshold values
@@ -512,7 +503,6 @@ def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):
     result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
     
     return result
-
     
 def display_curvature_and_car_pos_info(img, curve_radius, car_position_from_center):
     # Displaying curvature & car position on frame
@@ -529,8 +519,6 @@ def display_curvature_and_car_pos_info(img, curve_radius, car_position_from_cent
     cv2.putText(img, text, (30,120), font, 1, (255,255,255), 2, cv2.LINE_AA)
     
     return img
-
-
 
 def ad_lane_finding_pipeline(img):
     #pipeline for video edit
@@ -589,9 +577,7 @@ def ad_lane_finding_pipeline(img):
         leftx = track_lines.allx_left   
         lefty = track_lines.ally_left 
         poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = search_around_poly(combined_final)
-        draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
-        
-        
+        draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty) 
     
     #Verify lines were detected and proceed onto next frame
     if (left_fitx.size & right_fitx.size == 0):
@@ -622,12 +608,6 @@ def ad_lane_finding_pipeline(img):
     return final_image_w_text
 
 # Run Advanced Lane finding pipeline
-image = mpimg.imread('test_images/test1.jpg')
-test_image = ad_lane_finding_pipeline(image)
-plt.imshow(test_image)
-plt.show()
-
-
 video_output = 'project_video_output.mp4'
 clip1 = VideoFileClip("project_video.mp4")
 combined_clip = clip1.fl_image(ad_lane_finding_pipeline)
