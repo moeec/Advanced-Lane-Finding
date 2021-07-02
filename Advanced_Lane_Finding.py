@@ -1,4 +1,3 @@
-### import pickle
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
@@ -607,11 +606,64 @@ def ad_lane_finding_pipeline(img):
 
     return final_image_w_text
 
-# Run Advanced Lane finding pipeline
+#Reading in images for Prespective Transform for Assignment
+
+img1 = mpimg.imread("test_images/straight_lines1.jpg")
+img2 = mpimg.imread("test_images/straight_lines2.jpg")
+img3 = mpimg.imread("test_images/test1.jpg")
+img4 = mpimg.imread("test_images/test2.jpg")
+img5 = mpimg.imread("test_images/test3.jpg")
+img6 = mpimg.imread("test_images/test4.jpg")
+img7 = mpimg.imread("test_images/test5.jpg")
+img8 = mpimg.imread("test_images/test6.jpg")
+
+#Running Prespective transform on images
+pers_transform_test1 = warp(img1)
+pers_transform_test2 = warp(img2)
+pers_transform_test3 = warp(img3)
+pers_transform_test4 = warp(img4)
+pers_transform_test5 = warp(img5)
+pers_transform_test6 = warp(img6)
+pers_transform_test7 = warp(img7)
+pers_transform_test8 = warp(img8)
+
+#Writing images files with results from Prespective transform of images above
+cv2.imwrite("output_images/straight_lines1_output.jpg", pers_transform_test1)
+cv2.imwrite("output_images/straight_lines2_output.jpg", pers_transform_test2)
+cv2.imwrite("output_images/test1_output.jpg", pers_transform_test1)
+cv2.imwrite("output_images/test2_output.jpg", pers_transform_test1)
+cv2.imwrite("output_images/test3_output.jpg", pers_transform_test1)
+cv2.imwrite("output_images/test4_output.jpg", pers_transform_test1)
+cv2.imwrite("output_images/test5_output.jpg", pers_transform_test1)
+cv2.imwrite("output_images/test6_output.jpg", pers_transform_test1)
+
+
+poly_demo_input = mpimg.imread("test_images/test1.jpg")
+
+t = ad_lane_finding_pipeline(poly_demo_input)
+
+#poly_demo, poly_demo_left_fitx, poly_demo_right_fitx, poly_demo_ploty, poly_demo_left_fit, poly_demo_right_fit = fit_polynomial(poly_demo_input)
+#poly_demo_draw_step = draw_poly_lines(poly_demo, poly_demo_left_fitx, poly_demo_right_fitx, poly_demo_ploty)
+poly_demo_transform = warp(poly_demo_input)
+poly_demo_hls_img = hls_select(poly_demo_transform, thresh=(90, 255))
+poly_demo_gradx = abs_sobel_thresh(poly_demo_transform, orient='x', thresh_min=30, thresh_max=255)   
+poly_demo_grady = abs_sobel_thresh(poly_demo_transform, orient='y', thresh_min=30, thresh_max=100)
+poly_demo_mag_binary = mag_thresh(poly_demo_transform, sobel_kernel=3, mag_thresh=(20, 100))
+poly_demo_dir_binary = dir_threshold(poly_demo_transform, sobel_kernel=3, thresh=(0, np.pi/2))
+    
+poly_demo_combined = np.zeros_like(poly_demo_dir_binary)
+poly_demo_combined[((poly_demo_gradx == 1) & (poly_demo_grady == 1)) | ((poly_demo_mag_binary == 1) & (poly_demo_dir_binary == 1))] = 1       
+poly_demo_combined_final = np.zeros_like((poly_demo_dir_binary))
+poly_demo_combined_final[(poly_demo_combined == 1)|(poly_demo_hls_img == 1)] = 1
+poly_demo_combined_final *= 255  # scale the image
+
+poly_demo_image, poly_demo_left_fitx, poly_demo_right_fitx, poly_demo_ploty, poly_demo_left_fit, poly_demo_right_fit = fit_polynomial(poly_demo_combined_final)
+poly_demo_draw_step = draw_poly_lines(poly_demo_image, left_fitx, right_fitx, ploty)
+    
+cv2.imwrite("output_images/poly_demo.jpg", poly_demo_draw_step)
+
+ Run Advanced Lane finding pipeline
 video_output = 'project_video_output.mp4'
 clip1 = VideoFileClip("project_video.mp4")
 combined_clip = clip1.fl_image(ad_lane_finding_pipeline)
 combined_clip.write_videofile(video_output, audio=False)
-
-
-
