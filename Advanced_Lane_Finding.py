@@ -566,6 +566,7 @@ def ad_lane_finding_pipeline(img):
         righty = track_lines.ally_right   
         leftx = track_lines.allx_left     
         lefty = track_lines.ally_left
+       
     else:
         #------------------Searching Around Previous Region-------------------------
         #Picking up values from previous frame
@@ -580,7 +581,11 @@ def ad_lane_finding_pipeline(img):
     
     #Verify lines were detected and proceed onto next frame
     if (left_fitx.size & right_fitx.size == 0):
-        track_lines.detected = True
+        #toggle track_lines to False 
+        track_lines.detected = False
+        #Reset track__lines.frame to 1 sending pipeline back to full image detecttion and not searching around in previous areas
+        track_lines.frame == 1
+        print("No Lane Line detected")
     
     unwarp_step = unwarp(draw_step)
     unwarp_step = np.uint8(unwarp_step)
@@ -602,7 +607,8 @@ def ad_lane_finding_pipeline(img):
     track_lines.recent_xfitted_right = right_fitx
     track_lines.recent_xfitted_left =  left_fitx
     track_lines.current_fit_right = right_fit
-    track_lines.current_fit_left = left_fit 
+    track_lines.current_fit_left = left_fit
+    
 
     return final_image_w_text
 
@@ -662,8 +668,11 @@ poly_demo_draw_step = draw_poly_lines(poly_demo_image, left_fitx, right_fitx, pl
     
 cv2.imwrite("output_images/poly_demo.jpg", poly_demo_draw_step)
 
- Run Advanced Lane finding pipeline
+# Run Advanced Lane finding pipeline
 video_output = 'project_video_output.mp4'
 clip1 = VideoFileClip("project_video.mp4")
 combined_clip = clip1.fl_image(ad_lane_finding_pipeline)
 combined_clip.write_videofile(video_output, audio=False)
+
+
+
