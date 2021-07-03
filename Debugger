@@ -1,4 +1,3 @@
-### import pickle
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
@@ -84,17 +83,13 @@ class Line():
         self.ally_left = None
         #keeping track of frames
         self.frame = 0
+        #keeping track of frames
+        self.anomaly  = 0
 
 global track_lines
 track_lines = Line()
-print("Very Top")
-
-
-       
-
-
         
-def abs_sobel_thresh(img, orient='x', thresh_min=90, thresh_max=255):
+def abs_sobel_thresh(img, orient='x', thresh_min=90, thresh_max=255): # not use in  initial assignment, left for reference and for harder challenge 
     # Convert to grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     # Apply x or y gradient with the OpenCV Sobel() function
@@ -112,8 +107,6 @@ def abs_sobel_thresh(img, orient='x', thresh_min=90, thresh_max=255):
 
     # Return the result
     return binary_output
-
-
 
 def dir_threshold(img, sobel_kernel=3, thresh=(0, np.pi/2)):
     
@@ -133,7 +126,6 @@ def dir_threshold(img, sobel_kernel=3, thresh=(0, np.pi/2)):
     binary_output[(absgraddir >= thresh[0]) & (absgraddir <= thresh[1])] = 1
     #binary_output = np.copy(img) # Remove this line
     return binary_output
-
 
 # Define a function to return the magnitude of the gradient
 # for a given sobel kernel size and threshold values
@@ -288,7 +280,6 @@ def fit_polynomial(binary_warped):
     left_fit = np.polyfit(lefty, leftx, 2)
     right_fit = np.polyfit(righty, rightx, 2)
 
-
     # Generate x and y values for plotting
     ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
     try:
@@ -309,8 +300,8 @@ def fit_polynomial(binary_warped):
     #plt.plot(left_fitx, ploty, color='yellow')
     #plt.plot(right_fitx, ploty, color='yellow')
     #cv2.imwrite('fp.jpg', plt.plot(left_fitx, ploty, color='yellow'))
+    print("exiting build from scratch")
     return out_img, left_fitx, right_fitx, ploty, left_fit, right_fit
-
 
 
 def search_around_poly(binary_warped):
@@ -369,7 +360,7 @@ def search_around_poly(binary_warped):
     # Draw the lane onto the warped blank image
     #cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 0))
     #cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
-    result = cv2.addWeighted(out_img, 0.2, window_img, 0.3, 0)
+    result = cv2.addWeighted(out_img, 0.01, window_img, 0.3, 0)
     
     # Plot the polynomial lines onto the image
     #plt.plot(left_fitx, ploty, color='yellow')
@@ -514,7 +505,6 @@ def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):
     result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
     
     return result
-
     
 def display_curvature_and_car_pos_info(img, curve_radius, car_position_from_center):
     # Displaying curvature & car position on frame
@@ -530,13 +520,13 @@ def display_curvature_and_car_pos_info(img, curve_radius, car_position_from_cent
     text = 'Car Position From Center: ' + '{:02.4f}'.format(car_position_from_center) + 'm'
     cv2.putText(img, text, (30,120), font, 1, (255,255,255), 2, cv2.LINE_AA)
     
+    if (track_lines.anomaly == 1):
+        text = 'Recalculating From Scratch'
+        cv2.putText(img, text, (30,220), font, 1, (255,255,255), 2, cv2.LINE_AA)
+        track_lines.anomaly = 0
+        
+    
     return img
-
-
-def dec(g):
-    print(track_lines.allx_right)
-    first_time = 1
-    return first_time
 
 def ad_lane_finding_pipeline(img):
     #pipeline for video edit
@@ -544,18 +534,7 @@ def ad_lane_finding_pipeline(img):
     global rightx
     global lefty
     global righty
-    
-    print("------------------frame #-----------------")
     track_lines.frame +=1
-    print(track_lines.frame)
-    #first_time = dec(first_time)
-    #run_once(first_time)
-    print("Start")
-    print(track_lines.ally_left)
-    print(track_lines.ally_right)
-    print(track_lines.allx_right)
-    print( track_lines.allx_left)
-    print("end of trackers at beginning")
     pers_transform = warp(img)
     hls_img = hls_select(pers_transform, thresh=(90, 255))
     gradx = abs_sobel_thresh(pers_transform, orient='x', thresh_min=30, thresh_max=255)
@@ -563,19 +542,12 @@ def ad_lane_finding_pipeline(img):
     grady = abs_sobel_thresh(pers_transform, orient='y', thresh_min=30, thresh_max=100)
     mag_binary = mag_thresh(pers_transform, sobel_kernel=3, mag_thresh=(20, 100))
     dir_binary = dir_threshold(pers_transform, sobel_kernel=3, thresh=(0, np.pi/2))
-    sobel = abs_sobel_thresh(pers_transform, orient='x', thresh_min=90, thresh_max=255)
     
     combined = np.zeros_like(dir_binary)
     combined[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
         
     combined_final = np.zeros_like(dir_binary)
     combined_final[(combined == 1)|(hls_img == 1)] = 1
-    
-    print("again")
-    print(track_lines.ally_left)
-    print(track_lines.ally_right)
-    print(track_lines.allx_right)
-    print(track_lines.allx_left)
 
 
     
@@ -587,8 +559,6 @@ def ad_lane_finding_pipeline(img):
         global ploty
         global left_fit
         global right_fit
-        print("--------------------------------frame # in if--------------------------- ")
-        print(track_lines.frame)
         poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined_final)
         draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
         track_lines.bestx_right = (track_lines.current_fit_right+right_fit)/2 
@@ -596,53 +566,54 @@ def ad_lane_finding_pipeline(img):
         track_lines.diffs_right = right_fit - track_lines.current_fit_right
         track_lines.diffs_left = left_fit - track_lines.current_fit_left
         Check_diffs_left = track_lines.diffs_left.item(0)
+        Check_diffs_right = track_lines.diffs_left.item(0)
         Check_diffs_left = abs(Check_diffs_left)
+        Check_diffs_right = abs(Check_diffs_right)
         track_lines.recent_xfitted_right = right_fitx
         track_lines.recent_xfitted_left =  left_fitx
         track_lines.current_fit_right = right_fit
         track_lines.current_fit_left = left_fit
-        print("rightx")
-        print(track_lines.allx_right)
-        print("righty")
-        print(track_lines.ally_right)
-        print("leftx")
-        print(track_lines.allx_left)
-        print("lefty")
-        print(track_lines.ally_left)
-        print("---------------------------------------------1st time------------------------------------------")
         rightx = track_lines.allx_right   
         righty = track_lines.ally_right   
         leftx = track_lines.allx_left     
         lefty = track_lines.ally_left
+       
     else:
         #------------------Searching Around Previous Region-------------------------
         #Picking up values from previous frame
-        print("--------------------------------frame # in else--------------------------- ")
-        print(track_lines.frame)
-        print("in else")
-        print(track_lines.allx_left)
         right_fitx = track_lines.current_fit_right 
         left_fit = track_lines.current_fit_left
         rightx = track_lines.allx_right  
         righty = track_lines.ally_right 
         leftx = track_lines.allx_left   
-        lefty = track_lines.ally_left 
-        print("rightx")
-        print(rightx)
-        print("righty")
-        print(righty)
-        print(leftx)
-        print(lefty)
-        print(lefty)
-        print("end of else loop")
+        lefty = track_lines.ally_left
         poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = search_around_poly(combined_final)
-        draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty)
-        
-        
+        track_lines.diffs_right = right_fit - track_lines.current_fit_right
+        track_lines.diffs_left = left_fit - track_lines.current_fit_left
+        Check_diffs_left = track_lines.diffs_left.item(0)
+        Check_diffs_right = track_lines.diffs_right.item(0)
+        Check_diffs_left = abs(Check_diffs_left)
+        Check_diffs_right = abs(Check_diffs_right)
+        if (Check_diffs_left > 0.00013 or Check_diffs_right > 0.00012):
+            print("Recalculating from Scratch")
+            poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined_final)
+            right_fitx = track_lines.recent_xfitted_right
+            left_fitx = track_lines.recent_xfitted_left 
+            right_fit = track_lines.current_fit_right 
+            left_fit = track_lines.current_fit_left
+            track_lines.anomaly = 1
+        else:
+            poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = search_around_poly(combined_final)
+            #poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined_final)
+        draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty) 
     
     #Verify lines were detected and proceed onto next frame
     if (left_fitx.size & right_fitx.size == 0):
-        track_lines.detected = True
+        #toggle track_lines to False 
+        track_lines.detected = False
+        #Reset track__lines.frame to 1 sending pipeline back to full image detecttion and not searching around in previous areas
+        track_lines.frame == 1
+        print("No Lane Line detected")
     
     unwarp_step = unwarp(draw_step)
     unwarp_step = np.uint8(unwarp_step)
@@ -655,29 +626,61 @@ def ad_lane_finding_pipeline(img):
     final_image_w_text = display_curvature_and_car_pos_info(image_w_lanes_marked, curve_radius, car_position_from_center)
     #Tracking of lines detected & drawn
     
-    print("track_lines.allx_right")
-    print(track_lines.allx_right)
-    
     track_lines.bestx_right = (track_lines.current_fit_right+right_fit)/2 
     track_lines.bestx_left = (track_lines.current_fit_left+left_fit)/2 
     track_lines.diffs_right = right_fit - track_lines.current_fit_right
     track_lines.diffs_left = left_fit - track_lines.current_fit_left
     Check_diffs_left = track_lines.diffs_left.item(0)
+    Check_diffs_right = track_lines.diffs_right.item(0)
     Check_diffs_left = abs(Check_diffs_left)
+    Check_diffs_right = abs(Check_diffs_right)
     track_lines.recent_xfitted_right = right_fitx
     track_lines.recent_xfitted_left =  left_fitx
     track_lines.current_fit_right = right_fit
-    track_lines.current_fit_left = left_fit 
+    track_lines.current_fit_left = left_fit
+    print("Right")
+    print(Check_diffs_left)
+    print("Left")
+    print(Check_diffs_right)
+    print("end")
 
     return final_image_w_text
 
+#Reading in images for Prespective Transform for Assignment
+
+img1 = mpimg.imread("test_images/straight_lines1.jpg")
+img2 = mpimg.imread("test_images/straight_lines2.jpg")
+img3 = mpimg.imread("test_images/test1.jpg")
+img4 = mpimg.imread("test_images/test2.jpg")
+img5 = mpimg.imread("test_images/test3.jpg")
+img6 = mpimg.imread("test_images/test4.jpg")
+img7 = mpimg.imread("test_images/test5.jpg")
+img8 = mpimg.imread("test_images/test6.jpg")
+
+
+
+#Running Prespective transform on images
+pers_transform_test1 = warp(img1)
+pers_transform_test2 = warp(img2)
+pers_transform_test3 = warp(img3)
+pers_transform_test4 = warp(img4)
+pers_transform_test5 = warp(img5)
+pers_transform_test6 = warp(img6)
+pers_transform_test7 = warp(img7)
+pers_transform_test8 = warp(img8)
+
+#Writing images files with results from Prespective transform of images above
+cv2.imwrite("output_images/straight_lines1_output.jpg", pers_transform_test1)
+cv2.imwrite("output_images/straight_lines2_output.jpg", pers_transform_test2)
+cv2.imwrite("output_images/test1_output.jpg", pers_transform_test1)
+cv2.imwrite("output_images/test2_output.jpg", pers_transform_test1)
+cv2.imwrite("output_images/test3_output.jpg", pers_transform_test1)
+cv2.imwrite("output_images/test4_output.jpg", pers_transform_test1)
+cv2.imwrite("output_images/test5_output.jpg", pers_transform_test1)
+cv2.imwrite("output_images/test6_output.jpg", pers_transform_test1)
+
+
 # Run Advanced Lane finding pipeline
-image = mpimg.imread('test_images/test1.jpg')
-test_image = ad_lane_finding_pipeline(image)
-plt.imshow(test_image)
-plt.show()
-
-
 video_output = 'project_video_output.mp4'
 clip1 = VideoFileClip("project_video.mp4")
 combined_clip = clip1.fl_image(ad_lane_finding_pipeline)
