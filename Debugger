@@ -460,28 +460,31 @@ def measure_curvature_pixels(ploty, left_fit, right_fit, left_fitx, right_fitx):
 
 def measure_position_meters(image_w_lanes_marked, left_fit, right_fit):
     # Define conversions in x from pixels space to meters(x just needed for this calculation)
-    ym_per_pix = 30/720 # meters per pixel in y dimension
-    xm_per_pix = 3.7/700 # meters per pixel in x dimension
+    print("---------------------------------------------------------------------------------------------left_fit")
     
+    xm_per_pix = 3.7/700 # meters per pixel in x dimension
+  
     # Choose the y value corresponding to the bottom of the image
-    bottom_of_image = image_w_lanes_marked[0]
-
+    bottom_of_image = image_w_lanes_marked.shape[0]
+    
     # Calculate left and right line positions at the bottom of the image
     left_x_bottom_position = left_fit[0]*bottom_of_image**2 + left_fit[1]*bottom_of_image + left_fit[2]  
-    right_x_bottom_position = right_fit[0]*bottom_of_image**2 + right_fit[1]*bottom_of_image + right_fit[2]
-    
-    #Average out above numbers to get single value for left & right    
-    left_x_bottom_position_avg = np.mean(left_x_bottom_position)
-    right_x_bottom_position_avg = np.mean(right_x_bottom_position) 
+    right_x_bottom_position = right_fit[0]*bottom_of_image**2 + right_fit[1]*bottom_of_image + right_fit[2] 
     
     # Calculate the x position of the center of the lane 
-    center_of_lane_x_position = (left_x_bottom_position_avg + left_x_bottom_position_avg)//2
+    center_of_lane_x_position = (left_x_bottom_position + right_x_bottom_position)//2
+    
+    
+    center_of_image = image_w_lanes_marked.shape[1]//2
+    
+    #center_of_image = np.uint8(center_of_image)    
     
     # Calculate the deviation from center of the lane 
-    # The camera on the care is assumed to be in the center of the car
-    car_position = (center_of_lane_x_position - left_x_bottom_position_avg ) * xm_per_pix 
-    
+    # The camera on the car is assumed to be in the center of the car
+    car_position = (center_of_image - center_of_lane_x_position) * xm_per_pix 
+
     return car_position
+
 
 def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):     
     # Create an image to draw on and an image to show the selection window
@@ -594,7 +597,7 @@ def ad_lane_finding_pipeline(img):
         Check_diffs_right = track_lines.diffs_right.item(0)
         Check_diffs_left = abs(Check_diffs_left)
         Check_diffs_right = abs(Check_diffs_right)
-        if (Check_diffs_left > 0.00013 or Check_diffs_right > 0.00012):
+        if (Check_diffs_left > 0.00013 or Check_diffs_right > 0.00013):
             print("Recalculating from Scratch")
             poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined_final)
             right_fitx = track_lines.recent_xfitted_right
@@ -685,6 +688,4 @@ video_output = 'project_video_output.mp4'
 clip1 = VideoFileClip("project_video.mp4")
 combined_clip = clip1.fl_image(ad_lane_finding_pipeline)
 combined_clip.write_videofile(video_output, audio=False)
-
-
-
+             
