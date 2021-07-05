@@ -518,11 +518,6 @@ def display_curvature_and_car_pos_info(img, curve_radius, car_position_from_cent
     #Placement of text for Car Position info  
     text = 'Car Position From Center: ' + '{:02.4f}'.format(car_position_from_center) + 'm'
     cv2.putText(img, text, (30,120), font, 1, (255,255,255), 2, cv2.LINE_AA)
-    
-    if (track_lines.anomaly == 1):
-        text = 'Recalculating From Scratch'
-        cv2.putText(img, text, (30,220), font, 1, (255,255,255), 2, cv2.LINE_AA)
-        track_lines.anomaly = 0
          
     return img
 
@@ -594,20 +589,8 @@ def ad_lane_finding_pipeline(img):
         Check_diffs_right = track_lines.diffs_right.item(0)
         Check_diffs_left = abs(Check_diffs_left)
         Check_diffs_right = abs(Check_diffs_right)
-        if (Check_diffs_left > 0.000144900509781111 or Check_diffs_right > 0.000125765759584231):  
-
-            print("Recalculating from Scratch")               
+        if (Check_diffs_left > 0.000144900509781111 or Check_diffs_right > 0.000125765759584231):                 
             poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined_final)
-            rfx = right_fitx
-            lfx = left_fitx  
-            rf = right_fit   
-            lf = left_fit
-            print(Check_diffs_left)
-            #right_fitx = ((right_fitx) + (track_lines.recent_xfitted_right))/2
-            #left_fitx = ((left_fitx) + (track_lines.recent_xfitted_left))/2
-            #right_fit = ((right_fit) + (track_lines.current_fit_right))/2
-            #left_fit = ((left_fit) + (track_lines.current_fit_left))/2
-            
             ploty = (ploty + track_lines.ploty)/2
             right_fitx = track_lines.recent_xfitted_right
             left_fitx = track_lines.recent_xfitted_left 
@@ -616,7 +599,7 @@ def ad_lane_finding_pipeline(img):
             track_lines.anomaly = 1
         else:
             poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = search_around_poly(combined_final)
-            #poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined_final)
+           
         draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty) 
     
     #Verify lines were detected and proceed onto next frame
