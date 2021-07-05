@@ -83,6 +83,8 @@ class Line():
         self.ally_left = None
         #keeping track of frames
         self.frame = 0
+        #keeping track of frames
+        self.anomaly  = 0
 
 global track_lines
 track_lines = Line()
@@ -174,7 +176,6 @@ def clr_thresh(img, s_thresh=(170, 255), sx_thresh=(20, 100)):
     s_binary[(s_channel >= s_thresh[0]) & (s_channel <= s_thresh[1])] = 1
     # Stack each channel
     color_binary = np.dstack(( np.zeros_like(sxbinary), sxbinary, s_binary)) * 255
-    print(color_binary.shape)
     return color_binary
 
 
@@ -456,29 +457,28 @@ def measure_curvature_pixels(ploty, left_fit, right_fit, left_fitx, right_fitx):
 
 
 def measure_position_meters(image_w_lanes_marked, left_fit, right_fit):
-    # Define conversions in x from pixels space to meters(x just needed for this calculation)
-    ym_per_pix = 30/720 # meters per pixel in y dimension
+    # Define conversions in x from pixels space to meters(x dimensions just needed for this calculation)  
     xm_per_pix = 3.7/700 # meters per pixel in x dimension
-    
+  
     # Choose the y value corresponding to the bottom of the image
-    bottom_of_image = image_w_lanes_marked[0]
-
+    bottom_of_image = image_w_lanes_marked.shape[0]
+    
     # Calculate left and right line positions at the bottom of the image
     left_x_bottom_position = left_fit[0]*bottom_of_image**2 + left_fit[1]*bottom_of_image + left_fit[2]  
-    right_x_bottom_position = right_fit[0]*bottom_of_image**2 + right_fit[1]*bottom_of_image + right_fit[2]
-    
-    #Average out above numbers to get single value for left & right    
-    left_x_bottom_position_avg = np.mean(left_x_bottom_position)
-    right_x_bottom_position_avg = np.mean(right_x_bottom_position) 
+    right_x_bottom_position = right_fit[0]*bottom_of_image**2 + right_fit[1]*bottom_of_image + right_fit[2] 
     
     # Calculate the x position of the center of the lane 
-    center_of_lane_x_position = (left_x_bottom_position_avg + left_x_bottom_position_avg)//2
+    center_of_lane_x_position = (left_x_bottom_position + right_x_bottom_position)//2
+    
+    
+    center_of_image = image_w_lanes_marked.shape[1]//2   
     
     # Calculate the deviation from center of the lane 
-    # The camera on the care is assumed to be in the center of the car
-    car_position = (center_of_lane_x_position - left_x_bottom_position_avg ) * xm_per_pix 
-    
+    # The camera on the car is assumed to be in the center of the car
+    car_position = (center_of_image - center_of_lane_x_position) * xm_per_pix 
+
     return car_position
+
 
 def draw_poly_lines(binary_warped, left_fitx, right_fitx, ploty):     
     # Create an image to draw on and an image to show the selection window
@@ -517,6 +517,11 @@ def display_curvature_and_car_pos_info(img, curve_radius, car_position_from_cent
     text = 'Car Position From Center: ' + '{:02.4f}'.format(car_position_from_center) + 'm'
     cv2.putText(img, text, (30,120), font, 1, (255,255,255), 2, cv2.LINE_AA)
     
+    if (track_lines.anomaly == 1):
+        text = 'Recalculating From Scratch'
+        cv2.putText(img, text, (30,220), font, 1, (255,255,255), 2, cv2.LINE_AA)
+        track_lines.anomaly = 0
+         
     return img
 
 def ad_lane_finding_pipeline(img):
@@ -557,7 +562,9 @@ def ad_lane_finding_pipeline(img):
         track_lines.diffs_right = right_fit - track_lines.current_fit_right
         track_lines.diffs_left = left_fit - track_lines.current_fit_left
         Check_diffs_left = track_lines.diffs_left.item(0)
+        Check_diffs_right = track_lines.diffs_left.item(0)
         Check_diffs_left = abs(Check_diffs_left)
+        Check_diffs_right = abs(Check_diffs_right)
         track_lines.recent_xfitted_right = right_fitx
         track_lines.recent_xfitted_left =  left_fitx
         track_lines.current_fit_right = right_fit
@@ -575,8 +582,35 @@ def ad_lane_finding_pipeline(img):
         rightx = track_lines.allx_right  
         righty = track_lines.ally_right 
         leftx = track_lines.allx_left   
-        lefty = track_lines.ally_left 
+        lefty = track_lines.ally_left
         poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = search_around_poly(combined_final)
+        track_lines.diffs_right = right_fit - track_lines.current_fit_right
+        track_lines.diffs_left = left_fit - track_lines.current_fit_left
+        Check_diffs_left = track_lines.diffs_left.item(0)
+        Check_diffs_right = track_lines.diffs_right.item(0)
+        Check_diffs_left = abs(Check_diffs_left)
+        Check_diffs_right = abs(Check_diffs_right)
+        if (Check_diffs_left > 0.00014 or Check_diffs_right > 0.00013002):
+            print("Recalculating from Scratch")
+            poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined_final)
+            rfx = right_fitx
+            lfx = left_fitx  
+            rf = right_fit   
+            lf = left_fit
+            #right_fitx = ((right_fitx) + (track_lines.recent_xfitted_right))/2
+            #left_fitx = ((left_fitx) + (track_lines.recent_xfitted_left))/2
+            #right_fit = ((right_fit) + (track_lines.current_fit_right))/2
+            #left_fit = ((left_fit) + (track_lines.current_fit_left))/2
+            
+            
+            right_fitx = track_lines.recent_xfitted_right
+            left_fitx = track_lines.recent_xfitted_left 
+            right_fit = track_lines.current_fit_right 
+            left_fit = track_lines.current_fit_left
+            track_lines.anomaly = 1
+        else:
+            poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = search_around_poly(combined_final)
+            #poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined_final)
         draw_step = draw_poly_lines(poly_image, left_fitx, right_fitx, ploty) 
     
     #Verify lines were detected and proceed onto next frame
@@ -603,12 +637,13 @@ def ad_lane_finding_pipeline(img):
     track_lines.diffs_right = right_fit - track_lines.current_fit_right
     track_lines.diffs_left = left_fit - track_lines.current_fit_left
     Check_diffs_left = track_lines.diffs_left.item(0)
+    Check_diffs_right = track_lines.diffs_right.item(0)
     Check_diffs_left = abs(Check_diffs_left)
+    Check_diffs_right = abs(Check_diffs_right)
     track_lines.recent_xfitted_right = right_fitx
     track_lines.recent_xfitted_left =  left_fitx
     track_lines.current_fit_right = right_fit
     track_lines.current_fit_left = left_fit
-    
 
     return final_image_w_text
 
@@ -644,35 +679,9 @@ cv2.imwrite("output_images/test5_output.jpg", pers_transform_test1)
 cv2.imwrite("output_images/test6_output.jpg", pers_transform_test1)
 
 
-poly_demo_input = mpimg.imread("test_images/test1.jpg")
-
-t = ad_lane_finding_pipeline(poly_demo_input)
-
-#poly_demo, poly_demo_left_fitx, poly_demo_right_fitx, poly_demo_ploty, poly_demo_left_fit, poly_demo_right_fit = fit_polynomial(poly_demo_input)
-#poly_demo_draw_step = draw_poly_lines(poly_demo, poly_demo_left_fitx, poly_demo_right_fitx, poly_demo_ploty)
-poly_demo_transform = warp(poly_demo_input)
-poly_demo_hls_img = hls_select(poly_demo_transform, thresh=(90, 255))
-poly_demo_gradx = abs_sobel_thresh(poly_demo_transform, orient='x', thresh_min=30, thresh_max=255)   
-poly_demo_grady = abs_sobel_thresh(poly_demo_transform, orient='y', thresh_min=30, thresh_max=100)
-poly_demo_mag_binary = mag_thresh(poly_demo_transform, sobel_kernel=3, mag_thresh=(20, 100))
-poly_demo_dir_binary = dir_threshold(poly_demo_transform, sobel_kernel=3, thresh=(0, np.pi/2))
-    
-poly_demo_combined = np.zeros_like(poly_demo_dir_binary)
-poly_demo_combined[((poly_demo_gradx == 1) & (poly_demo_grady == 1)) | ((poly_demo_mag_binary == 1) & (poly_demo_dir_binary == 1))] = 1       
-poly_demo_combined_final = np.zeros_like((poly_demo_dir_binary))
-poly_demo_combined_final[(poly_demo_combined == 1)|(poly_demo_hls_img == 1)] = 1
-poly_demo_combined_final *= 255  # scale the image
-
-poly_demo_image, poly_demo_left_fitx, poly_demo_right_fitx, poly_demo_ploty, poly_demo_left_fit, poly_demo_right_fit = fit_polynomial(poly_demo_combined_final)
-poly_demo_draw_step = draw_poly_lines(poly_demo_image, left_fitx, right_fitx, ploty)
-    
-cv2.imwrite("output_images/poly_demo.jpg", poly_demo_draw_step)
-
 # Run Advanced Lane finding pipeline
 video_output = 'project_video_output.mp4'
 clip1 = VideoFileClip("project_video.mp4")
 combined_clip = clip1.fl_image(ad_lane_finding_pipeline)
 combined_clip.write_videofile(video_output, audio=False)
-
-
-
+             
