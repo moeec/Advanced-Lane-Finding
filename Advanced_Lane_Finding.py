@@ -83,8 +83,10 @@ class Line():
         self.ally_left = None
         #keeping track of frames
         self.frame = 0
-        #keeping track of frames
+        #keeping track of anomaly frames
         self.anomaly  = 0
+        #keeping track of ploty
+        self.ploty  = 0
 
 global track_lines
 track_lines = Line()
@@ -569,6 +571,7 @@ def ad_lane_finding_pipeline(img):
         track_lines.recent_xfitted_left =  left_fitx
         track_lines.current_fit_right = right_fit
         track_lines.current_fit_left = left_fit
+        track_lines.ploty = ploty
         rightx = track_lines.allx_right   
         righty = track_lines.ally_right   
         leftx = track_lines.allx_left     
@@ -586,23 +589,26 @@ def ad_lane_finding_pipeline(img):
         poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = search_around_poly(combined_final)
         track_lines.diffs_right = right_fit - track_lines.current_fit_right
         track_lines.diffs_left = left_fit - track_lines.current_fit_left
+        track_lines.ploty = ploty
         Check_diffs_left = track_lines.diffs_left.item(0)
         Check_diffs_right = track_lines.diffs_right.item(0)
         Check_diffs_left = abs(Check_diffs_left)
         Check_diffs_right = abs(Check_diffs_right)
-        if (Check_diffs_left > 0.00014 or Check_diffs_right > 0.00013002):
-            print("Recalculating from Scratch")
+        if (Check_diffs_left > 0.000144900509781111 or Check_diffs_right > 0.000125765759584231):  
+
+            print("Recalculating from Scratch")               
             poly_image, left_fitx, right_fitx, ploty, left_fit, right_fit = fit_polynomial(combined_final)
             rfx = right_fitx
             lfx = left_fitx  
             rf = right_fit   
             lf = left_fit
+            print(Check_diffs_left)
             #right_fitx = ((right_fitx) + (track_lines.recent_xfitted_right))/2
             #left_fitx = ((left_fitx) + (track_lines.recent_xfitted_left))/2
             #right_fit = ((right_fit) + (track_lines.current_fit_right))/2
             #left_fit = ((left_fit) + (track_lines.current_fit_left))/2
             
-            
+            ploty = (ploty + track_lines.ploty)/2
             right_fitx = track_lines.recent_xfitted_right
             left_fitx = track_lines.recent_xfitted_left 
             right_fit = track_lines.current_fit_right 
