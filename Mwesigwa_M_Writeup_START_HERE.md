@@ -124,7 +124,7 @@ The "Object points" will be the known object co-ordintes of the chessboard corne
 
 
 
-![Example Output_Image][/output_images/calibration1_output.jpg "Output Image"]
+![Example Output_Image][output_images/calibration1_output.jpg "Output Image"]
 
 
 ### Pipeline (single images)
@@ -137,14 +137,14 @@ I used the objpoints and imgpoints collected above to compute the camera calibra
 The "cal_undistort"  uses OpenCV's module cv2.calibrateCamera(). 
 The output from the function can be found in the /output_images folders, this is image1 - image 20 above.
 
-![Calibration Image](/output_images/calibration1_output.jpg)
+![Calibration Image](output_images/calibration1_output.jpg)
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
 I used a combination of color and gradient thresholds to generate a binary images that can be found at:
 
-![Combined Binary Output_Image][/output_images/straight_lines1_binary_output.jpg"]
-![Combined Binary Output_Image][/output_images/straight_lines2_binary_output.jpg"]
+![Combined Binary Output_Image][output_images/straight_lines1_binary_output.jpg"]
+![Combined Binary Output_Image][output_images/straight_lines2_binary_output.jpg"]
 
 (thresholding steps at lines #67 through #78 in `Thresholded_Binary_Image.ipynb`).
 
@@ -209,7 +209,7 @@ A line is drawn over the detected pixels in the sliding windows and fit to a 2nd
 
 The output image of this can be found at:
  
-![Polynomial fit Image][/output_images/poly_demo.jpg]
+![Polynomial fit Image][output_images/poly_demo.jpg]
 
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
