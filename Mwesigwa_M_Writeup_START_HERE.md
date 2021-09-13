@@ -28,9 +28,9 @@ Thresholded_Binary_Image.ipynb - Combined Threshold Binary demonstration
 
 [//]: # (Image References)
 
-[image1]: ./output_images/calibration1_output.jpg "Undistorted Calibration Image 1"
-[image2]: ./output_images/calibration2_output.jpg "Undistorted Calibration Image 2"
-[image3]: ./output_images/calibration3_output.jpg "Undistorted Calibration Image 3"
+[image1]: output_images/calibration1_output.jpg "Undistorted Calibration Image 1"
+[image2]: output_images/calibration2_output.jpg "Undistorted Calibration Image 2"
+[image3]: output_images/calibration3_output.jpg "Undistorted Calibration Image 3"
 [image4]: ./output_images/calibration4_output.jpg "Undistorted Calibration Image 4"
 [image5]: ./output_images/calibration5_output.jpg "Undistorted Calibration Image 5"
 [image6]: ./output_images/calibration6_output.jpg "Undistorted Calibration Image 6"
