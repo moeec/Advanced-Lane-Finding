@@ -124,8 +124,7 @@ The "Object points" will be the known object co-ordintes of the chessboard corne
 
 
 
-![Example Output_Image][output_images/calibration1_output.jpg "Output Image"]
-
+![Example Output_Image][image1] 
 
 ### Pipeline (single images)
 
@@ -268,8 +267,6 @@ While the above process is going on I use class Line with variable track_lines t
 ---
 
 ### Discussion
-
-#### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
 My approach in this project is based on a pipeline (above) that involved alot of matrix math using NumPy, matrix math is performed on images and combined thresholds using OpenCV real-time optimized Computer Vision library. I had originally just combined gradient & magnitude thresholds to find lane lines and had trouble with the parts of 
 the video where there is a lightly colored pavement to the left of the image and where there are shadows formed by trees. By combinging my initial binary images with a sobel threshold I was able to detect lanes in these tricky areas. For car position I was able to get the lowest left and right lane activated pixels in each image, average this out then measure this from the center.
